@@ -1,18 +1,21 @@
 services:
   app:
     build: .
-    container_name: sports-app
+    container_name: sports_app
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
       - PORT=3000
       - DATABASE_URL=postgresql://sports:sports@db:5432/sports
+      - REDIS_URL=redis://cache:6379
     volumes:
       - ./:/usr/src/app
       - /usr/src/app/node_modules
     depends_on:
       db:
+        condition: service_healthy
+      cache:
         condition: service_healthy
     restart: unless-stopped
 
@@ -33,6 +36,30 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  cache:
+    image: redis:7-alpine
+    container_name: sports_cache
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: sports_redis_commander
+    environment:
+      - REDIS_HOSTS=local:cache:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      cache:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
