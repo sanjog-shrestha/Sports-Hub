@@ -1,0 +1,110 @@
+:root {
+    --bg: #0f1115;
+    --card: #1a1d24;
+    --accent: #00c389;
+    --text: #e8e9ec;
+    --text-dim: #9098a4;
+    --border: #2a2e37;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.topbar {
+    padding: 2rem 1.5rem 1.5rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+}
+
+.topbar h1 {
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+.tagline {
+    color: var(--text-dim);
+    margin: 0.4rem 0 0;
+    font-size: 0.95rem;
+}
+
+main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+#scores h2 {
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    margin-bottom: 1rem;
+}
+
+.scoreboard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.game-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.game-league {
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    width: 60px;
+}
+
+.game-teams {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0 1rem;
+}
+
+.team-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.score {
+    font-weight: 700;
+}
+
+.game-status {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    width: 110px;
+    text-align: right;
+}
+
+.loading,
+.error {
+    color: var(--text-dim);
+}
+
+footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}

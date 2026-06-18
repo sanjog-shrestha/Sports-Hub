@@ -1,0 +1,16 @@
+{
+    "name": "sports-docker-app",
+    "version": "0.1.0",
+    "description": "Minimal Node/Express sports app scaffold, designed to run in Docker and grow over time.",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node --watch server.js"
+    },
+    "dependencies": {
+        "express": "^4.19.2"
+    },
+    "engines": {
+        "node": ">=18"
+    }
+}
