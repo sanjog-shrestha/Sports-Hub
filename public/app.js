@@ -18,6 +18,26 @@ async function loadScores() {
     }
 }
 
+async function loadTeams() {
+    const container = document.getElementById('teamsList');
+
+    try {
+        const res = await fetch('/api/teams');
+        if (!res.ok) throw new Error('Request failed: ' + res.status)
+
+        const teams = await res.json();
+
+        if (!teams.length) {
+            container.innerHTML = '<p class="loading">No teams found.</p>';
+            return;
+        }
+
+        container.innerHTML = teams.map(renderTeamCard).join('');
+    } catch (err) {
+        container.innerHTML = `<p class="error">Couldn't load teams: ${err.message}</p>`;
+    }
+}
+
 function renderGameCard(game) {
     return `
         <div class="game-card">
@@ -37,4 +57,15 @@ function renderGameCard(game) {
     `;
 }
 
+function renderTeamCard(team) {
+    return `
+        <div class="team-card">
+          <span class="team-league-tag">${team.league}</span>
+          <p class="team-name">${team.name}</p>
+          <p class="team-city">${team.city || ''}</p>
+        </div>
+    `;
+}
+
 loadScores();
+loadTeams();

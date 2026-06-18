@@ -1,8 +1,14 @@
 const express = require('express');
 const path = require('path');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Connection string is provided by docker-compose for the containerized setup; the fallback lets the app still boot for non-DB routes when running locally without Postgres.
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL || 'postgresql://sports:sports@localhost:5432/sports'
+});
 
 // Serve static frontend
 app.use(express.static(path.join(__dirname, 'public')));
@@ -12,6 +18,28 @@ app.use(express.json());
 // or orchestration later on.
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+// Confirms the app can actually reach Postgres, separate from the
+// general health check above.
+app.get('/api/db-health', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT NOW() as now');
+        res.json({ status: 'ok', dbTime: result.rows[0].now });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+// Teams seeded into Postgres by db/init.sql. This is the first
+// real (non-mock) data source in the project.
+app.get('/api/teams', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, name, league, city FROM teams ORDER BY id');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
 });
 
 // Mock sports data endpoint. Replace this later with a real
