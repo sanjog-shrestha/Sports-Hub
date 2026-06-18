@@ -18,12 +18,15 @@ async function loadScores() {
     }
 }
 
-async function loadTeams() {
+async function loadTeams(query = '') {
     const container = document.getElementById('teamsList');
 
     try {
-        const res = await fetch('/api/teams');
-        if (!res.ok) throw new Error('Request failed: ' + res.status)
+
+        const url = query ? `/api/teams/search?q=${encodeURIComponent(query)}` : '/api/teams';
+
+        const res = await fetch(url);
+        if (!res.ok) { throw new Error('Request failed: ' + res.status) }
 
         const teams = await res.json();
 
@@ -66,6 +69,21 @@ function renderTeamCard(team) {
         </div>
     `;
 }
+let searchTimeout;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('teamSearch');
+
+    if (!searchInput) return;
+
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+
+        searchTimeout = setTimeout(() => {
+            loadTeams(e.target.value.trim());
+        }, 300);
+    });
+});
 
 loadScores();
 loadTeams();

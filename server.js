@@ -140,6 +140,65 @@ app.get('/api/teams', withCache('teams:all', CACHE_TTL_SECONDS.teams, async (req
     }
 }));
 
+// Search teams by name, city, or league
+app.get('/api/teams/search', async (req, res) => {
+    const query = (req.query.q || '').trim();
+    const cacheKey = `teams:search:${query.toLowerCase()}`;
+
+    // Redis cache lookup
+    if (redisReady) {
+        try {
+            const cached = await redisClient.get(cacheKey);
+
+            if (cached) {
+                res.set('X-Cache', 'HIT');
+                return res.json(JSON.parse(cached));
+            }
+        } catch (err) {
+            console.warn('Redis search cache read failed:', err.message);
+        }
+    }
+
+    try {
+        const result = await pool.query(
+            ` 
+            SELECT
+                id,
+                name,
+                league,
+                city
+            FROM teams
+            WHERE 
+                LOWER(name) LIKE LOWER($1)
+                OR LOWER(city) LIKE LOWER($1)
+                OR LOWER(league) LIKE LOWER($1)
+            ORDER BY name    
+            `,
+            [`%${query}%`]
+        );
+
+        // Cache result
+        if (redisReady) {
+            redisClient
+                .setEx(
+                    cacheKey,
+                    CACHE_TTL_SECONDS.teamsm,
+                    JSON.stringify(result.rows)
+                )
+                .catch(err =>
+                    console.warn('Redis search cache write failed:', err.message));
+        }
+
+        res.set('X-Cache', 'MISS');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            message: err.message
+        });
+    }
+});
+
 // Mock scores, cached under 'scores:all' for 30s. Replace with a real data
 // source later; the caching pattern is already in place.
 app.get('/api/scores', withCache('scores:all', CACHE_TTL_SECONDS.scores, (req, res) => {
