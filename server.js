@@ -157,7 +157,7 @@ app.get('/api/teams/search', async (req, res) => {
             redisClient
                 .setEx(
                     cacheKey,
-                    CACHE_TTL_SECONDS.teamsm,
+                    CACHE_TTL_SECONDS.teams,
                     JSON.stringify(result.rows)
                 )
                 .catch(err =>
@@ -230,6 +230,72 @@ app.delete('/api/favorites/:id', async (req, res) => {
             status: 'error',
             message: err.message
         })
+    }
+});
+
+app.get('/api/teams/:id', async (req, res) => {
+    const cacheKey = `team:${req.params.id}`;
+
+    if (redisReady) {
+        try {
+            const cached = await redisClient.get(cacheKey);
+
+            if (cached) {
+                res.set('X-Cache', 'HIT');
+                return res.json(JSON.parse(cached));
+            }
+        } catch (err) {
+            console.warn(
+                'Redis team cache read failed:',
+                err.message
+            );
+        }
+    }
+
+    try {
+        const result = await pool.query(
+            `
+            SELECT
+                id,
+                name,
+                league,
+                city
+            FROM teams
+            WHERE id = $1
+            `,
+            [req.params.id]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Team not found'
+            });
+        }
+
+        if (redisReady) {
+            redisClient
+                .setEx(
+                    cacheKey,
+                    CACHE_TTL_SECONDS.teams,
+                    JSON.stringify(result.rows[0])
+                )
+                .catch(err =>
+                    console.warn(
+                        'Redis team cache write failed:',
+                        err.message
+                    )
+                );
+        }
+
+        res.set('X-Cache', 'MISS');
+        res.json(result.rows[0]);
+
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            message: err.message
+        });
     }
 });
 

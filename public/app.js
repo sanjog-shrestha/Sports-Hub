@@ -84,7 +84,7 @@ function renderTeamCard(team) {
     const isFavorite = favoriteTeams.includes(team.id);
 
     return `
-        <div class="team-card">
+        <div class="team-card" onclick="openteam(${team.id})">
           <button class="favorite-btn" onclick="toggleFavorite(${team.id})">${isFavorite ? '⭐' : '☆'}</button>
 
           <span class="team-league-tag">${team.league}</span>
@@ -108,6 +108,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300);
     });
 });
+
+async function openTeam(id) {
+    const res = await fetch(`/api/teams/${id}`);
+    const team = await res.json();
+
+    document.getElementById('teamDetails').innerHTML = `
+        <h2>${team.name}</h2>
+        <p>League: ${team.league}</p>
+        <p>City: ${team.city}</p?
+        `;
+
+    document.getElementById('teamModal').classList.remove('hidden');
+}
+
+function closeTeamModal() {
+    document.getElementById('teamModal').classList.add('hidden');
+}
 
 (async () => {
     await loadFavorites();
