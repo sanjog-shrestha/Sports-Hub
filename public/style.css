@@ -177,6 +177,15 @@ footer {
     font-size: 0.9rem;
 }
 
+.favorite-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.3rem;
+    float: right;
+    color: #ffd700;
+}
+
 @media (max-width: 768px) {
     .teams-grid {
         grid-template-columns: 1fr;

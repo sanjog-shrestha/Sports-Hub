@@ -1,3 +1,5 @@
+let favoriteTeams = [];
+
 async function loadScores() {
     const container = document.getElementById('scoreboard');
 
@@ -41,6 +43,24 @@ async function loadTeams(query = '') {
     }
 }
 
+async function loadFavorites() {
+    const res = await fetch('/api/favorites');
+    favoriteTeams = await res.json();
+}
+
+async function toggleFavorite(id) {
+    const isFavorite = favoriteTeams.includes(id);
+    const method = isFavorite ? 'DELETE' : 'POST';
+
+    await fetch(
+        `/api/favorites/${id}`,
+        { method }
+    );
+
+    await loadFavorites();
+    await loadTeams();
+}
+
 function renderGameCard(game) {
     return `
         <div class="game-card">
@@ -61,8 +81,12 @@ function renderGameCard(game) {
 }
 
 function renderTeamCard(team) {
+    const isFavorite = favoriteTeams.includes(team.id);
+
     return `
         <div class="team-card">
+          <button class="favorite-btn" onclick="toggleFavorite(${team.id})">${isFavorite ? '⭐' : '☆'}</button>
+
           <span class="team-league-tag">${team.league}</span>
           <p class="team-name">${team.name}</p>
           <p class="team-city">${team.city || ''}</p>
@@ -85,5 +109,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-loadScores();
-loadTeams();
+(async () => {
+    await loadFavorites();
+    await loadTeams();
+    await loadScores();
+})();

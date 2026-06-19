@@ -2,28 +2,15 @@ const express = require('express');
 const path = require('path');
 const { Pool } = require('pg');
 const { createClient } = require('redis');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Connection string is provided by docker-compose for the containerized setup; the fallback lets the app still boot for non-DB routes when running locally without Postgres.
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL || 'postgresql://sports:sports@localhost:5432/sports'
 });
-
-// --- Redis cache layer ---------------------------------------------------
-// Cache-aside in front of /api/teams and /api/scores. If Redis is
-// unreachable, the app serves requests uncached instead of failing.
-
-// In docker-compose REDIS_URL is redis://cache:6379 ("cache" = service name);
-// the localhost fallback is for running outside Docker.
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-
-// createClient() only builds the client — connection happens via .connect()
-// below, fired in the background so a missing Redis never blocks startup.
-// redisReady tracks usability (the client signals connection state through
-// events, not exceptions); routes run in BYPASS mode until 'ready' fires.
 const redisClient = createClient({ url: REDIS_URL });
+const FAVORITES_KEY = 'favorites';
+
 let redisReady = false;
 
 redisClient.on('error', (err) => {
@@ -42,16 +29,13 @@ redisClient.connect().catch((err) => {
     console.warn(`Could not connect to Redis (${err.message}). Continuing without caching.`);
 });
 
-// TTL in seconds before Redis auto-deletes the key. Scores are "live" data
-// (short TTL); teams are near-static reference data (long TTL).
+
 const CACHE_TTL_SECONDS = {
     scores: 30,
     teams: 300
 };
 
-// Wraps a handler with cache-aside: serve from Redis on a hit, otherwise run
-// the handler and store its response. Sets an X-Cache header
-// (HIT/MISS/BYPASS/SKIP) so behavior is visible via `curl -i`.
+
 function withCache(cacheKey, ttlSeconds, handler) {
     return async (req, res) => {
         // Redis down — skip the cache, don't block on a dead connection.
@@ -60,8 +44,7 @@ function withCache(cacheKey, ttlSeconds, handler) {
             return handler(req, res);
         }
 
-        // On a hit, return the cached JSON. A failed read just falls through
-        // to the real handler rather than breaking the request.
+
         try {
             const hit = await redisClient.get(cacheKey);
             if (hit) {
@@ -72,15 +55,13 @@ function withCache(cacheKey, ttlSeconds, handler) {
             console.warn(`Redis read failed for "${cacheKey}":`, err.message);
         }
 
-        // Miss: wrap res.json so the handler's response is written to Redis
-        // on its way out, keeping the handler itself cache-unaware.
+
         const originalJson = res.json.bind(res);
         res.json = (body) => {
-            // Only cache successful responses, never error bodies.
+
             if (res.statusCode >= 200 && res.statusCode < 300) {
                 res.set('X-Cache', 'MISS');
-                // setEx = SET with expiry; fire-and-forget so a failed write
-                // can't break an otherwise-successful response.
+
                 redisClient
                     .setEx(cacheKey, ttlSeconds, JSON.stringify(body))
                     .catch((err) => console.warn(`Redis write failed for "${cacheKey}":`, err.message));
@@ -94,18 +75,15 @@ function withCache(cacheKey, ttlSeconds, handler) {
     };
 }
 
-// Serve static frontend
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Health check — useful once you add docker-compose healthchecks
-// or orchestration later on.
+
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', uptime: process.uptime() });
 });
 
-// Confirms the app can actually reach Postgres, separate from the
-// general health check above.
+
 app.get('/api/db-health', async (req, res) => {
     try {
         const result = await pool.query('SELECT NOW() as now');
@@ -115,8 +93,7 @@ app.get('/api/db-health', async (req, res) => {
     }
 });
 
-// Confirms the app can reach Redis, mirroring /api/db-health. Returns 503
-// (not 500) when Redis is simply not connected, since that's a handled state.
+
 app.get('/api/cache-health', async (req, res) => {
     if (!redisReady) {
         return res.status(503).json({ status: 'unavailable', message: 'Redis is not connected; running in no-cache mode.' });
@@ -129,8 +106,7 @@ app.get('/api/cache-health', async (req, res) => {
     }
 });
 
-// Teams from Postgres, cached under 'teams:all' for 300s. The query below
-// only runs on a cache miss.
+
 app.get('/api/teams', withCache('teams:all', CACHE_TTL_SECONDS.teams, async (req, res) => {
     try {
         const result = await pool.query('SELECT id, name, league, city FROM teams ORDER BY id');
@@ -140,7 +116,6 @@ app.get('/api/teams', withCache('teams:all', CACHE_TTL_SECONDS.teams, async (req
     }
 }));
 
-// Search teams by name, city, or league
 app.get('/api/teams/search', async (req, res) => {
     const query = (req.query.q || '').trim();
     const cacheKey = `teams:search:${query.toLowerCase()}`;
@@ -199,8 +174,7 @@ app.get('/api/teams/search', async (req, res) => {
     }
 });
 
-// Mock scores, cached under 'scores:all' for 30s. Replace with a real data
-// source later; the caching pattern is already in place.
+
 app.get('/api/scores', withCache('scores:all', CACHE_TTL_SECONDS.scores, (req, res) => {
     res.json([
         { id: 1, league: 'NBA', home: 'Lakers', away: 'Celtics', homeScore: 102, awayScore: 98, status: 'Final' },
@@ -209,6 +183,55 @@ app.get('/api/scores', withCache('scores:all', CACHE_TTL_SECONDS.scores, (req, r
         { id: 4, league: 'MLB', home: 'Yankees', away: 'Red Sox', homeScore: 0, awayScore: 0, status: 'Scheduled - 7:05 PM' }
     ]);
 }));
+
+app.get('/api/favorites', async (req, res) => {
+    try {
+        const ids = await redisClient.sMembers(FAVORITES_KEY);
+
+        res.json(ids.map(Number));
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            message: err.message
+        })
+    }
+});
+
+app.post('/api/favorites/:id', async (req, res) => {
+    try {
+        await redisClient.sAdd(
+            FAVORITES_KEY,
+            req.params.id
+        );
+
+        res.json({
+            message: "Team added to favorites"
+        });
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            message: err.message
+        })
+    }
+});
+
+app.delete('/api/favorites/:id', async (req, res) => {
+    try {
+        await redisClient.sRem(
+            FAVORITES_KEY,
+            req.params.id
+        );
+
+        res.json({
+            message: "Team removed to favorites"
+        });
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            message: err.message
+        })
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Sports app listening on port ${PORT}`);
