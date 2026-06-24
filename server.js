@@ -299,6 +299,68 @@ app.get('/api/teams/:id', async (req, res) => {
     }
 });
 
+app.get('/api/teams/:id/players', async (req, res) => {
+    const cacheKey =
+        `roster:${req.params.id}`;
+
+    if (redisReady) {
+        try {
+            const cached = await redisClient.get(cacheKey);
+
+            if (cached) {
+                res.set('X-Cache', 'HIT');
+                return res.json(
+                    JSON.parse(cached)
+                );
+            }
+        } catch (err) {
+            console.warn(
+                'Roster cache read failed:',
+                err.message
+            );
+        }
+    }
+
+    try {
+        const result = await pool.query(
+            `
+            SELECT
+                id,
+                name,
+                position,
+                jersey_number
+            FROM players
+            WHERE team_id = $1
+            ORDER BY jersey_number
+            `,
+            [req.params.id]
+        );
+
+        if (redisReady) {
+            redisClient
+                .setEx(
+                    cacheKey,
+                    300,
+                    JSON.stringify(result.rows)
+                )
+                .catch(err =>
+                    console.warn(
+                        'Roster cache write failed:',
+                        err.message
+                    )
+                );
+        }
+        res.set('X-Cache', 'MISS');
+
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            message: err.message
+        });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Sports app listening on port ${PORT}`);
 });

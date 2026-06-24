@@ -84,8 +84,8 @@ function renderTeamCard(team) {
     const isFavorite = favoriteTeams.includes(team.id);
 
     return `
-        <div class="team-card" onclick="openteam(${team.id})">
-          <button class="favorite-btn" onclick="toggleFavorite(${team.id})">${isFavorite ? '⭐' : '☆'}</button>
+        <div class="team-card" onclick="openTeam(${team.id})">
+          <button class="favorite-btn" onclick="event.stopPropagation(); toggleFavorite(${team.id}))">${isFavorite ? '⭐' : '☆'}</button>
 
           <span class="team-league-tag">${team.league}</span>
           <p class="team-name">${team.name}</p>
@@ -112,12 +112,35 @@ document.addEventListener('DOMContentLoaded', () => {
 async function openTeam(id) {
     const res = await fetch(`/api/teams/${id}`);
     const team = await res.json();
+    const rosterRes = await fetch(
+        `/api/teams/${id}/players`
+    );
+    const roster = await rosterRes.json();
 
     document.getElementById('teamDetails').innerHTML = `
         <h2>${team.name}</h2>
         <p>League: ${team.league}</p>
-        <p>City: ${team.city}</p?
-        `;
+        <p>City: ${team.city}</p>
+        <h3>Roster</h3>
+
+        <div class="roster-list">
+            ${roster.map(player => `
+                <div class="player-row">
+                    <span>
+                        #${player.jersey_number}
+                    </span>
+                    
+                    <span>
+                        ${player.name}
+                    </span>
+                    
+                    <span>
+                        ${player.position}
+                    </span>
+                </div>
+            `).join('')}
+        </div>
+    `;
 
     document.getElementById('teamModal').classList.remove('hidden');
 }

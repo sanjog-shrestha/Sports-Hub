@@ -218,6 +218,17 @@ footer {
     cursor: pointer;
 }
 
+.roster-list {
+    margin-top: 1rem;
+}
+
+.player-row {
+    display: flex;
+    justify-content: space-between;
+    padding: .75rem;
+    border-bottom: 1px solid var(--border);
+}
+
 @media (max-width: 768px) {
     .teams-grid {
         grid-template-columns: 1fr;
